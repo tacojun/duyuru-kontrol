@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "duyuru-kontrol"
+version = "0.1.0"
+description = "Türkçe duyurularda tarih-gün tutarlılığı ve metin uzunluğu denetimi"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+duyuru-kontrol = "duyuru_kontrol.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["duyuru_kontrol*"]
