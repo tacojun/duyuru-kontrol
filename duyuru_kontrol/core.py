@@ -119,7 +119,15 @@ def check_text(text: str, *, year: int | None = None, max_chars: int | None = No
             continue
 
         month_token = _tr_lower(match.group("month"))
-        month = int(month_token) if month_token.isdigit() else MONTHS[month_token]
+        if month_token.isdigit():
+            month = int(month_token)
+        else:
+            month = MONTHS.get(month_token)
+            if month is None:
+                diagnostics.append(Diagnostic(
+                    "INVALID_MONTH", f"Geçersiz ay adı: {match.group('month')}.", line, column,
+                ))
+                continue
         try:
             actual_date = date(actual_year, month, int(match.group("day")))
         except ValueError:

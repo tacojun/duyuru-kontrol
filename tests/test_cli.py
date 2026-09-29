@@ -32,6 +32,13 @@ class CliChecks(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("okunamadı", result.stderr)
 
+    def test_invalid_month_variant_returns_diagnostic_instead_of_crashing(self):
+        result = self.run_cli("-", "--format", "json",
+                              input_text="24 MAYİS 2026 Pazar")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(json.loads(result.stdout)[0]["diagnostics"][0]["code"], "INVALID_MONTH")
+        self.assertEqual(result.stderr, "")
+
 
 if __name__ == "__main__":
     unittest.main()
