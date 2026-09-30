@@ -26,7 +26,7 @@ def _year(value: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Türkçe duyurularda tarih-gün eşleşmesini ve karakter sınırını kontrol et."
+        description="Türkçe duyurularda tarih geçerliliğini, tarih-gün eşleşmesini ve karakter sınırını kontrol et."
     )
     parser.add_argument("files", metavar="DOSYA", nargs="+", help="UTF-8 dosyalar; standart girdi için -")
     parser.add_argument("--year", type=_year, help="Yıl yazılmayan tarihler için yıl")

@@ -1,4 +1,4 @@
-"""Tarih-gün eşleşmesi ve açıkça tanımlanmış karakter sınırı kontrolleri."""
+"""Tarih geçerliliği, tarih-gün eşleşmesi ve karakter sınırı kontrolleri."""
 
 from __future__ import annotations
 
@@ -15,17 +15,19 @@ WEEKDAYS = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"
 _WEEKDAY_RE = "|".join(WEEKDAYS)
 _MONTH_RE = "|".join(MONTHS)
 
-# Accept full Turkish month names or dotted numeric dates only when a weekday is
-# written alongside the date. A year can be in the text or supplied explicitly.
+# A weekday is optional: always validate the date, then compare its weekday if
+# one is stated. Named dates may take their year from the explicit --year option.
 _NAMED_DATE = re.compile(
-    rf"(?<!\w)(?P<day>\d{{1,2}})\s+(?P<month>{_MONTH_RE})\s+"
-    rf"(?:(?P<year>\d{{4}})\s+)?(?P<weekday>{_WEEKDAY_RE})"
-    rf"(?:\s+(?P<year_after>\d{{4}}))?(?!\w)",
+    rf"(?<!\w)(?P<day>\d{{1,2}})\s+(?P<month>{_MONTH_RE})(?!\w)"
+    rf"(?:\s+(?P<year>\d{{4}})(?!\w))?"
+    rf"(?:\s+(?P<weekday>{_WEEKDAY_RE})(?!\w)"
+    rf"(?:\s+(?P<year_after>\d{{4}})(?!\w))?)?",
     re.IGNORECASE,
 )
 _NUMERIC_DATE = re.compile(
-    rf"(?<!\w)(?P<day>\d{{1,2}})\.(?P<month>\d{{1,2}})\."
-    rf"(?P<year>\d{{4}})\s+(?P<weekday>{_WEEKDAY_RE})(?!\w)",
+    rf"(?<![\w.])(?P<day>\d{{1,2}})\.(?P<month>\d{{1,2}})\."
+    rf"(?P<year>\d{{4}})(?!\w|\.\d)"
+    rf"(?:\s+(?P<weekday>{_WEEKDAY_RE})(?!\w))?",
     re.IGNORECASE,
 )
 
@@ -70,7 +72,7 @@ class Report:
 
 
 def check_text(text: str, *, year: int | None = None, max_chars: int | None = None) -> Report:
-    """Check dated weekdays and optionally count against a character limit.
+    """Validate dates, compare stated weekdays and optionally limit characters.
 
     A single final line ending is ignored because text files commonly contain
     one. Internal line breaks and other characters are counted.
@@ -136,9 +138,9 @@ def check_text(text: str, *, year: int | None = None, max_chars: int | None = No
             ))
             continue
 
-        stated_day = _tr_lower(match.group("weekday"))
+        stated_day = match.group("weekday")
         expected_day = WEEKDAYS[actual_date.weekday()]
-        if stated_day != _tr_lower(expected_day):
+        if stated_day is not None and _tr_lower(stated_day) != _tr_lower(expected_day):
             diagnostics.append(Diagnostic(
                 "WEEKDAY_MISMATCH",
                 f"{actual_date:%d.%m.%Y} için doğru gün {expected_day}; metinde {match.group('weekday')} yazıyor.",

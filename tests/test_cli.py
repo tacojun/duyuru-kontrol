@@ -32,6 +32,36 @@ class CliChecks(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("okunamadı", result.stderr)
 
+    def test_invalid_date_without_weekday_returns_error_and_location(self):
+        for text in ("31 Eylül 2026", "31.09.2026"):
+            with self.subTest(text=text):
+                result = self.run_cli("-", "--format", "json", input_text=f"GTO\nTarih: {text}")
+                self.assertEqual(result.returncode, 1)
+                report = json.loads(result.stdout)[0]
+                self.assertFalse(report["ok"])
+                self.assertEqual(report["checked_dates"], 1)
+                self.assertEqual(report["diagnostics"][0]["code"], "INVALID_DATE")
+                self.assertEqual((report["diagnostics"][0]["line"], report["diagnostics"][0]["column"]), (2, 8))
+
+    def test_missing_year_without_weekday_is_not_reported_as_success(self):
+        result = self.run_cli("-", "--format", "json", input_text="24 Eylül")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(json.loads(result.stdout)[0]["diagnostics"][0]["code"], "YEAR_REQUIRED")
+
+    def test_valid_dates_without_weekday_return_success(self):
+        result = self.run_cli("-", "--year", "2026", "--format", "json", input_text="24 Eylül ve 25.09.2026")
+        self.assertEqual(result.returncode, 0)
+        report = json.loads(result.stdout)[0]
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["checked_dates"], 2)
+
+    def test_mixed_weekday_and_bare_dates_preserve_diagnostics(self):
+        result = self.run_cli("-", "--format", "json", input_text="24 Eylül 2026 Çarşamba; 31.09.2026")
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)[0]
+        self.assertEqual(report["checked_dates"], 2)
+        self.assertEqual([d["code"] for d in report["diagnostics"]], ["WEEKDAY_MISMATCH", "INVALID_DATE"])
+
     def test_invalid_month_variant_returns_diagnostic_instead_of_crashing(self):
         result = self.run_cli("-", "--format", "json",
                               input_text="24 MAYİS 2026 Pazar")
