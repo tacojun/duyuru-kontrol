@@ -1,0 +1,2 @@
+recursive-include examples *.txt
+include scripts/check_installed.py

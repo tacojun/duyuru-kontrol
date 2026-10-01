@@ -13,26 +13,57 @@ geçerli yılı varsaymaz.
 
 Python 3.11 veya yenisi gerekir. Başka çalışma bağımlılığı yoktur.
 
-```bash
-python -m duyuru_kontrol duyuru.txt --year 2026 --max-chars 1000
-```
-
-Paket olarak kurmak ve komutu kullanmak için:
+Kaynak kodun bulunduğu dizinde, ayrı bir sanal ortama kurun:
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install .
-duyuru-kontrol duyuru.txt --year 2026 --max-chars 1000
+duyuru-kontrol examples/duyuru.txt --year 2026 --max-chars 1000
 ```
+
+Son komut örnekteki iki uç tarihi denetler ve çıkış kodu 0 döndürür.
+Windows PowerShell'de etkinleştirme komutu `.venv\Scripts\Activate.ps1`'dir.
+Kurulumdan sonra `duyuru-kontrol` ve Python API'si kaynak dizini dışında da
+kullanılabilir; editable kurulum veya `PYTHONPATH` ayarı gerekmez.
+
+Kaynak kodu değiştirmeden kurmak için [GitHub Releases](https://github.com/tacojun/duyuru-kontrol/releases)
+sayfasından wheel, kaynak dağıtımı ve `SHA256SUMS` dosyasını aynı dizine indirin.
+Linux'ta sağlama toplamlarını kontrol edip wheel'i etkin sanal ortama kurun:
+
+```bash
+sha256sum -c SHA256SUMS
+python -m pip install ./duyuru_kontrol-0.2.0-py3-none-any.whl
+```
+
+Wheel yerine kaynak dağıtımı da kurulabilir:
+`python -m pip install ./duyuru_kontrol-0.2.0.tar.gz`.
+Bu paketler GitHub'dan dağıtılır; PyPI yayını yapılmamıştır.
 
 Standart girdiyi `-` ile okuyabilir, birden çok dosyayı kontrol edebilir ve
 makine tarafından okunabilir JSON üretebilirsiniz:
 
 ```bash
-printf '24 Eylül Perşembe' | python -m duyuru_kontrol - --year 2026 --format json
+printf '24 Eylül Perşembe' | duyuru-kontrol - --year 2026 --format json
+duyuru-kontrol examples/yilsiz-duyuru.txt --year 2026 --format json
+duyuru-kontrol examples/hatali-duyuru.txt --format json
 ```
 
-Yanlış gün veya karakter sınırı aşımı için çıkış kodu **1**, dosya/argüman
-hatası için **2**, başarılı denetim için **0** döner.
+Son örnek, geçersiz başlangıç tarihi için `INVALID_DATE`, `checked_dates: 2`
+ve çıkış kodu 1 üretir. Yılı olmayan örnek `--year` olmadan çalıştırılırsa
+`YEAR_REQUIRED` verir. Komut yerine `python -m duyuru_kontrol` da kullanılabilir.
+
+Python API'si:
+
+```python
+from duyuru_kontrol import check_text
+
+report = check_text("24–25 Eylül 2026")
+print(report.to_dict())  # ok: True, checked_dates: 2
+```
+
+Denetim hataları (tarih/aralık, hafta günü, yıl veya karakter sınırı) için
+çıkış kodu **1**, dosya/argüman hatası için **2**, başarılı denetim için **0** döner.
 
 ## Kapsam ve sınırlar
 
@@ -105,3 +136,16 @@ python -m unittest discover -s tests -v
 ```
 
 GitHub Actions bu testleri Python 3.11, 3.12 ve 3.13 üzerinde çalıştırır.
+Her sürümde wheel ve kaynak dağıtımı ayrıca ayrı temiz sanal ortamlara kurulur;
+kaynak dizini dışında CLI, JSON çıktısı, hata konumları ve Python API'si denetlenir.
+Bu paket kontrolleri kaynak testlerinden ayrıdır.
+
+Dağıtım paketlerini oluşturmak için yalnızca geliştirme aracını kurun:
+
+```bash
+python -m pip install build
+python -m build
+```
+
+Paketler `dist/` altında oluşur. `build` ve setuptools kurulum/derleme araçlarıdır;
+uygulamanın çalışma zamanı bağımlılığı değildir.
