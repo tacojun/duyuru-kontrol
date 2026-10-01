@@ -15,10 +15,12 @@ WEEKDAYS = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"
 _WEEKDAY_RE = "|".join(WEEKDAYS)
 _MONTH_RE = "|".join(MONTHS)
 
-# A weekday is optional: always validate the date, then compare its weekday if
-# one is stated. Named dates may take their year from the explicit --year option.
+# Consume shared-month ranges as a whole so their final date is not matched
+# again. A weekday is optional for single dates, but ambiguous for a range.
+# Named dates may take their year from the explicit --year option.
 _NAMED_DATE = re.compile(
-    rf"(?<!\w)(?P<day>\d{{1,2}})\s+(?P<month>{_MONTH_RE})(?!\w)"
+    rf"(?<!\w)(?:(?P<start_day>\d{{1,2}})\s*[-–—]\s*)?"
+    rf"(?P<day>\d{{1,2}})\s+(?P<month>{_MONTH_RE})(?!\w)"
     rf"(?:\s+(?P<year>\d{{4}})(?!\w))?"
     rf"(?:\s+(?P<weekday>{_WEEKDAY_RE})(?!\w)"
     rf"(?:\s+(?P<year_after>\d{{4}})(?!\w))?)?",
@@ -72,10 +74,12 @@ class Report:
 
 
 def check_text(text: str, *, year: int | None = None, max_chars: int | None = None) -> Report:
-    """Validate dates, compare stated weekdays and optionally limit characters.
+    """Validate dates/ranges, compare weekdays and optionally limit characters.
 
     A single final line ending is ignored because text files commonly contain
-    one. Internal line breaks and other characters are counted.
+    one. Internal line breaks and other characters are counted. checked_dates
+    counts candidates, including both range endpoints even when invalid or
+    missing a year; it is not a count of successfully validated dates.
     """
     if year is not None and not 1 <= year <= 9999:
         raise ValueError("year must be between 1 and 9999")
@@ -130,6 +134,34 @@ def check_text(text: str, *, year: int | None = None, max_chars: int | None = No
                     "INVALID_MONTH", f"Geçersiz ay adı: {match.group('month')}.", line, column,
                 ))
                 continue
+
+        start_day = match.groupdict().get("start_day")
+        if start_day is not None:
+            endpoints = []
+            for group in ("start_day", "day"):
+                endpoint_line, endpoint_column = _location(content, match.start(group))
+                try:
+                    endpoints.append(date(actual_year, month, int(match.group(group))))
+                except ValueError:
+                    diagnostics.append(Diagnostic(
+                        "INVALID_DATE",
+                        f"Geçersiz tarih: {match.group(group)} {match.group('month')} {actual_year}.",
+                        endpoint_line, endpoint_column,
+                    ))
+            if len(endpoints) == 2 and endpoints[0] > endpoints[1]:
+                diagnostics.append(Diagnostic(
+                    "REVERSED_RANGE", "Tarih aralığının başlangıcı bitişinden sonra.",
+                    line, column,
+                ))
+            if match.group("weekday") is not None:
+                diagnostics.append(Diagnostic(
+                    "AMBIGUOUS_RANGE_WEEKDAY",
+                    "Aralıktaki gün adının hangi tarihe ait olduğu belirsiz; "
+                    "uç tarihleri ay, yıl ve gün adlarıyla ayrı ayrı yazın.",
+                    line, column,
+                ))
+            continue
+
         try:
             actual_date = date(actual_year, month, int(match.group("day")))
         except ValueError:
@@ -154,4 +186,6 @@ def check_text(text: str, *, year: int | None = None, max_chars: int | None = No
             1, 1,
         ))
 
-    return Report(len(content), len(matches), tuple(diagnostics))
+    checked_dates = sum(2 if match.groupdict().get("start_day") is not None else 1
+                        for match in matches)
+    return Report(len(content), checked_dates, tuple(diagnostics))
